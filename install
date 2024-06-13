@@ -1,0 +1,30 @@
+#!/bin/bash
+
+
+###############################
+### GLOBAL VARIABLE
+###############################
+LIBS_CORE=($pwd)/instalib
+LIBS_HOST=$LIBS_CORE/host
+LIBS_POST=$LIBS_CORE/post
+LIBS_PREP=$LIBS_CORE/prep
+LIBS_ENVI=$LIBS_CORE/envi
+
+##############################
+### INIT SOURCE
+##############################
+source $LIBS_PREP/link
+source $LIBS_CORE/libs
+source $LIBS_PREP/form
+source $LIBS_PREP/disk
+source $LIBS_PREP/base
+source $LIBS_PREP/init
+
+
+##############################
+### MAIN FUNCTION
+##############################
+yuros_init
+
+
+
