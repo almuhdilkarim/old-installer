@@ -1,0 +1,6 @@
+#!/bin/bash
+
+yuros_init() {
+  yuros_link_init
+  yuros_form_init
+}
