@@ -1,0 +1,205 @@
+#!/bin/bash
+
+
+###############################
+### base package
+###############################
+
+yuros_core_prep() {
+  notif_prep
+  notif "prepare base package"
+  notif "prepare base-devel package"
+  ready_prep
+}
+
+yuros_core_inst() {
+  notif_inst
+	pacstrap /mnt base base-devel git
+  ready_inst  	
+}
+
+
+yuros_core_conf() {
+  notif_conf
+  genfstab -U /mnt >> /mnt/etc/fstab
+  notif "disk layout : radyy"
+
+	cp /etc/systemd/network/* /mnt/etc/systemd/network/ 
+  notif "networking  : ready"
+  ready_conf
+}
+
+
+yuros_core_init() {
+  heads &&
+  yuros_core_prep &&
+  yuros_core_inst &&
+  yuros_core_conf &&
+}
+
+
+#####################################
+### post preparation
+#####################################
+
+yuros_main_prep() {
+  notif_prep
+  mdir /mnt/install &&
+  notif "post installation directory"
+  ready_prep
+}
+
+yuros_main_inst() {
+  
+  notif_inst 
+	
+  cp $LIBS_POST/* /mnt/install &&
+	chmod +x /mnt/install/* &&
+  notif 'post installation script' 
+	
+  cp $LIBS_CORE/dial /mnt/install &&
+	chmod +x /mnt/install/dial &&
+  notif 'dialog interactie script'
+  
+  cp $LIBS_CORE/libs /mnt/install
+  chmod +x /mnt/install/libs
+  notif 'post library bin script'
+
+  ready_inst
+}
+
+
+yuros_main_conf() {
+  notif_conf 
+	cp /etc/systemd/network/* /mnt/etc/systemd/network/ &&
+  notif 'systemd network'
+  ready_conf
+}
+
+
+yuros_main_init() {
+  heads &&
+  yuros_post_prep &&
+  yuros_post_inst &&
+  yuros_post_conf
+}
+
+##############################
+### environtment
+##############################
+
+yuros_envi_prep() {
+  notif_prep
+  mdir '/mnt/install'
+  notif 'environtment directory'
+  ready_prep
+}
+
+
+yuros_envi_inst() {
+  notif_inst
+  mfil '/mnt/install/envi' 
+  notif 'environtment file'
+  ready_inst
+}
+
+
+yuros_envi_conf() {
+  ENVFILE=/mnt/install/envi
+  echo "TARGET_HOSTNAME=$TARGET_HOSTNAME" > $ENVFILE
+  notif 'hostname environtment'
+  echo "TARGET_INSTMODE=$TARGET_INSTMODE" >> $ENVFILE
+  notif 'instmod environtment'
+  echo "TARGET_BOOTPART=$TARGET_BOOTPART" >> $ENVFILE
+  notif 'bootpart environtment'
+  echo "TARGET_ROOTPART=$TARGET_ROOTPART" >> $ENVFILE
+  notif 'rootpart environtment'
+  echo "TARGET_LVM2NAME=$TARGET_LVM2NAME" >> $ENVFILE
+  notif 'lvm2name environtment'
+  echo "TARGET_ROOTUUID=$TARGET_ROOTUUID" >> $ENVFILE
+  notif 'rootuuid environtment'
+  echo "TARGET_USERNAME=$TARGET_USERNAME" >> $ENVFILE
+  notif 'username environtment'
+  echo "TARGET_USERPASS=$TARGET_USERPASS" >> $ENVFILE
+  notif 'password environtment'
+  echo "TARGET_DESKENVI=$TARGET_DESKENVI" >> $ENVFILE
+  notif 'dekstop environtment'
+}
+
+
+yuros_envi_init() {
+  heads &&
+  yuros_envi_prep &&
+  yuros_envi_inst &&
+  yuros_envi_conf &&
+}
+
+
+
+###################################
+### BASE POST INSTALL
+####################################
+
+yuros_post_prep() {
+  notif_prep
+  rm -fr /mnt/install
+  notif 'remove installation'
+  ready_prep
+}
+
+
+yuros_post_inst() {
+  notif_inst
+  echo "nameserver 8.8.8.8" >> /mnt/etc/resolv.conf
+  notif 'set google dns server'
+  echo "nameserver 1.1.1.1" >> /mnt/etc/resolv.conf
+  notif 'set cloudlfare dns server'
+  ready_prep
+}
+
+
+yuros_post_conf() {
+  notif_conf
+  umount -R /mnt
+  notif 'umount installation diks'
+  umount -R /srv
+  notif 'clean installation package'
+  ready_conf
+}
+
+
+yuros_post_init() {
+  heads &&
+  yuros_remv_prep 
+  yuros_remv_inst
+  yuros_remv_conf
+}
+
+####################################
+### REBOOT OPTION
+####################################
+
+yuros_rebo_init() {
+  heads &&
+  echo "Installation Finished"
+  echo "------------------------------------"
+  echo ""
+  read -p "Do you want reboot now (y/n) : " INSTALLREBOOT
+
+  if [[ $INSTALLREBOOT = "y" || $INSTALLREBOOT = "Y" ]];then
+	  reboot 
+  fi
+}
+
+####################################
+### MAIN FUNCTION 
+#################################### 
+
+yuros_base_init() {	
+	yuros_core_init &&
+  yuros_main_init &&
+  yuros_envi_init &&
+	arch-chroot /mnt /bin/bash /install/init &&
+  yuros_post_init &&
+  yuros_rebo_init
+}

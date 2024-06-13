@@ -1,0 +1,286 @@
+#!/bin/bash
+
+
+################################
+## PREPARATION
+################################
+
+yuros_disk_load() {
+  
+  echo 'preparing and cleaning installation disk '
+	if [[ ! -d  "/mnt/"* ]];then
+		umount -R /mnt > /dev/null && sleep 1 
+	fi
+	rm -fr /mnt/* && sleep 1
+} 
+
+
+yuros_lvm2_note() {
+	echo '-->' $1 ' partition is creted';
+}
+
+yuros_swip_note() {
+  echo '-->' $1 ' partition is formated'
+}
+
+
+
+################################
+## LUSK ENCRYPTION
+################################
+
+yuros_luks_form() {
+
+	echo $TARGET_LUKSPASS | cryptsetup luksFormat /dev/$TARGET_ROOTPART  &&
+  echo '--> Format root partition with encryption support (LUKS)' &&
+	sleep 5
+}
+
+
+yuros_luks_open() {
+  if [ -z $TARGET_LUKSPASS ];then
+    cryptsetup luksOpen /dev/$TARGET_ROOTPART $TARGET_HOSTNAME && 
+  else
+	  echo $TARGET_LUKSPASS | cryptsetup luksOpen /dev/$TARGET_ROOTPART $TARGET_HOSTNAME &&
+  fi
+  sleep 5
+}
+
+yuros_luks_init() {
+  if [ ! $TARGET_SECLEVEL = 'standard' ];then
+
+    heads &&
+    lead 'Luks Encryption'
+    if [ $TARGET_OPERATION = 'makes' ];then
+      yuros_luks_form
+      echo '--> disk formated with luks encryption support'
+    else
+      echo '--> luks not formated on recovery operation mode'
+    fi
+    if [ ! -z /dev/$TARGET_HOSTNAME ];then
+      yuros_luks_open
+      echo "--> $TARGET_USER encrypted drive luks "
+    else
+      echo "--> $TARGET_USER ecnrypted drive failed"
+      exit 
+    fi
+  fi
+}
+
+
+################################
+## CREATE VOLUME
+################################
+
+
+yuros_lvm2_luks() {
+  if [ ! $TARGET_SECLEVEL = 'standard' ];then
+	  pvcreate /dev/mapper/$TARGET_HOSTNAME > /dev/null &&
+    yuros_lvm2_note 'physical'
+	  vgcreate $TARGET_LVM2NAME /dev/mapper/$TARGET_HOSTNAME > /dev/null
+    yuros_lvm2_note 'logical'
+  fi
+}
+
+
+yuros_lvm2_plan() {
+  if [ $TARGET_SECLEVEL = 'standard' ];then
+	  pvcreate /dev/$TARGET_ROOTPART &&
+    yuros_lvm2_note 'physical'
+	  vgcreate $TARGET_LVM2NAME /dev/$TARGET_ROOTPART
+    yuros_lvm2_note 'logical'
+  fi
+}
+
+
+yuros_lvm2_ddsk() {
+  if [ $TARGET_INSTMODE = 'desktop' ];then
+    lvcreate -L 25G $TARGET_LVM2NAME -n root
+    yuros_lvm2_note 'root'
+    lvcreate -l 100%FREE $TARGET_LVM2NAME -n home
+    yuros_lvm2_note 'root'
+  fi
+}
+
+
+yuros_lvm2_dsrv() {
+  if [ $TARGET_INSTMODE = 'server' ];then
+    lvcreate -L 15G $TARGET_LVM2NAME -n root
+    yuros_lvm2_note 'root'
+    lvcreate -L 15G $TARGET_LVM2NAME -n usrd
+    yuros_lvm2_note 'usr'
+    lvcreate _L 5GG $TARGET_LVM2NAME -n vtmp
+    yuros_lvm2_note 'var/tmp'
+    lvcreate -L 5G  $TARGET_LVM2NAME -n vlog
+    yuros_lvm2_note 'var/log'
+    lvcreate -l100%FREE $TARGET_LVM2NAME -n home
+    yuros_lvm2_note 'home'
+  fi
+}
+
+
+yuros_lvm2_dvhs() {
+  if [ $TARGET_INSTMODE = 'vhost' ];then
+    lvcreate -L 10G $TARGET_LVM2NAME -n root
+    yuros_lvm2_note 'root'
+    lvcreate -L 5G  $TARGET_LVM2NAME -n home
+    yuros_lvm2_note 'home'
+    lvcreate -L 15G $TARGET_LVM2NAME -n usrd
+    yuros_lvm2_note 'usr'
+    lvcreate -L 5G  $TARGET_LVM2NAME -n vtmp
+    yuros_lvm2_note 'var/tmp'
+    lvcreate -L 5G  $TARGET_LVM2NAME -n vlog
+    yuros_lvm2_note 'var/log'
+    lvcreate -l100%FREE $TARGET_LVM2NAME -n vars
+    yuros_lvm2_note 'var'
+  fi
+}
+
+
+yuros_lvm2_init() {
+  if [ $TARGET_OPERATION = 'makes' ];then
+
+    heads &&
+    lead 'Logical Volume Setup'
+    yuros_lvm2_plan
+    yuros_lvm2_luks
+    yuros_lvm2_ddsk 
+    yuros_lvm2_dsrv 
+    yuros_lvm2_dvhs
+  fi
+}
+
+
+
+##############################
+## DISK FORMAT
+##############################
+
+
+yuros_swip_boot() {
+  if [ -d /dev/$TARGET_BOOTPART/ ];then
+	  yes y | mkfs.vfat -n SYS_BOOT -F32 /dev/$TARGET_BOOTPART > /dev/null &&
+	  mkdir /mnt/boot &&
+	  mount /dev/$TARGET_BOOTPART /mnt/boot &&
+    yuros_swip_note 'home' 
+	  sleep 1
+  fi
+}
+
+
+yuros_swip_root() {
+  if [ -d /dev/$TARGET_LVM2NAME/root ];then
+	  yes y | mkfs.ext4 -L SYS_ROOT /dev/$TARGET_LVM2NAME/root > /dev/null &&
+	  mount /dev/$TARGET_LVM2NAME/root /mnt &&
+    yuros_swip_note 'root' 
+	  sleep 1
+  fi
+}
+
+
+yuros_swip_home() {
+  if [ -d /dev/$TARGET_LVM2NAME/home ];then
+	  if [ ! $TARGET_OPERATION = 'recov' ];then
+		  yes y | mkfs.ext4 -L SYS_HOME /dev/$TARGET_LVM2NAME/home > /dev/null
+	  fi
+	  mkdir /mnt/home &&
+	  mount /dev/$TARGET_LVM2NAME/home /mnt/home &&
+    yuros_swip_note 'home' 
+	  sleep 1
+  fi
+}
+
+
+yuros_swip_usrd() {
+  if [ -d /dev/$TARGET_LVM2NAME/usrd ];then
+	  yes y | mkfs.ext4 -L SYS_USRD /dev/$TARGET_LVM2NAME/usrd > /dev/null &&
+	  mkdir /mnt/usr &&
+	  mount /dev/$TARGET_LVM2NAME/usrd /mnt/usr &&
+    yuros_swip_note 'usr' 
+	  sleep 1
+  fi
+}
+
+
+yuros_swip_temp() {
+  if [ -d /dev/$TARGET_LVM2NAME/temp ];then
+	  yes y | mkfs.ext4 -L SYS_VARS /dev/$TARGET_LVM2NAME/temp > /dev/null &&
+	  mkdir /mnt/tmp &&
+	  mount /dev/$TARGET_LVM2NAME/temp /mnt/tmp &&
+    yuros_swip_note 'tmp' 
+	  sleep 1
+  fi
+}
+
+
+yuros_swip_vars() {
+  if [ -d /dev/$TARGET_LVM2NAME/vars ];then
+	  yes y | mkfs.ext4 -L SYS_VARS /dev/$TARGET_LVM2NAME/vars > /dev/null &&
+	  mkdir /mnt/var &&
+	  mount /dev/$TARGET_LVM2NAME/vars /mnt/var &&
+    yuros_swip_note 'var' 
+	  sleep 1
+  fi
+}
+
+
+yuros_swip_vcac() {
+  if [ -d /dev/$TARGET_LVM2NAME/vcac ];then
+	  yes y | mkfs.ext4 -L SYS_VCAC /dev/$TARGET_LVM2NAME/vcac > /dev/null &&
+	  mkdir /mnt/var &&
+	  mkdir /mnt/var/cache &&
+	  mount /dev/$TARGET_LVM2NAME/vcac /mnt/var/cache &&
+    yuros_swip_note 'var/cache' 
+	  sleep 1
+  fi
+}
+
+
+yuros_swip_vlog() {
+  if [ -d /dev/$TARGET_LVM2NAME/vlog ];then
+	  yes y | mkfs.ext4 -L SYS_VLOG /dev/$TARGET_LVM2NAME/vlog > /dev/null &&
+	  mkdir /mnt/var/log &&
+	  mount /dev/$TARGET_LVM2NAME/vlog /mnt/var/log &&
+    yuros_swip_note 'var/log' 
+	  sleep 1
+  fi
+}
+
+
+yuros_swip_vtmp() {
+  if [ -d /dev/$TARGET_LVM2NAME/vtmp ];then
+	  yes y | mkfs.ext4 -L SYS_VTMP /dev/$TARGET_LVM2NAME/vtmp > /dev/null &&
+	  mkdir /mnt/var/tmp &&
+	  mount /dev/$TARGET_LVM2NAME/vtmp /mnt/var/tmp &&
+	  yuros_swip_note 'var/tmp' 
+	  sleep 1
+  fi
+}
+
+
+yuros_swip_init() {
+  heads &&
+  lead 'Disk format'
+  yuros_swip_boot &&
+  yuros_swip_root &&
+  yuros_swip_home &&
+  yuros_swip_usrd &&
+  yuros_swip_temp &&
+  yuros_swip_vars &&
+  yuros_swip_vcac &&
+  yuros_swip_vlog &&
+  yuros_swip_vtmp
+}
+
+
+#####################################
+## MAIN FUNCTION
+#####################################
+
+
+yuros_disk_init() {
+  yuros_disk_load &&
+	yuros_luks_init &&
+	yuros_lvm2_init &&
+	yuros_swip_init
+}

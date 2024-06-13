@@ -1,0 +1,149 @@
+#!/bin/bash
+
+yuros_form_base() {
+	heads &&
+	echo 'System base information'
+	read -p 'hostname : ' TARGET_HOSTNAME
+	read -p 'username : ' TARGET_USERNAME
+	read -s -p 'password   : ' TARGET_USERPASS
+
+	if [[ -z $GET_USERNAME ]]; then
+		TARGET_USERNAME='root'
+	fi
+}
+
+
+yuros_form_envi() {
+	PROFILE=$LIBS_HOST/$TARGET_HOSTNAME
+	if [ ! -f $PROFILE ]; then
+		touch $LIBS_HOST/$TARGET_HOSTNAME
+		sleep 1
+	fi
+	echo "TARGET_HOSTNAME=$TARGET_HOSTNAME" >$PROFILE
+	echo "TARGET_USERNAME=$TARGET_USERNAME" >>$PROFILE
+	echo "TARGET_USERPASS=$TARGET_USERPASS" >>$PROFILE
+}
+
+
+yuros_form_rlos() {
+	heads &&
+	lead 'Operating System'
+	INSTOSRL=('libra' 'scorpio' 'taurus' 'virgo' 'aries' 'yuros')
+	menus $INSTOSRL 'TARGET_INSTOSRL'
+}
+
+
+yuros_form_mode() {
+	heads &&
+	lead 'Installation Target'
+	INSTMODE=('desktop' 'server' 'vhost')
+	menus $INSTOSRL 'TARGET_INSTMODE'
+}
+
+
+yuros_form_secs() {
+	heads &&
+	leads 'Security Level'
+	SECSMODE=('standard' 'hardened')
+	menus $SECSMODE 'TARGET_SECLEVEL'
+}
+
+
+yuros_form_cdsk() {
+
+}
+
+
+yuros_form_dbot() {
+	heads &&
+	lead 'Boot disk configuration'
+	ldsk TARGET_BOOTPART
+	echo "TARGET_BOOTPART=$TARGET_BOOTPART" >>$PROFILE
+}
+
+
+yuros_form_dlvm() {
+	if [ ! $TARGET_SECLEVEL = 'standard' ]; then
+		read -s -p "encrypt password :" TARGET_LUKSPASS
+		TARGET_LVM2NAME=${TARGET_HOSTNAME:0:4}
+		echo "TARGET_LUKSPASS=$TARGET_LUKSPASS" >>$PROFILE
+		echo "TARGET_LVM2NAME=$TARGET_LVM2NAME" >>$PROFILE
+	fi
+}
+
+
+yuros_form_drot() {
+	heads &&
+	echo "Please make sure your disk root partition have more than 50G free space."
+	echo "Root disk configuration :"
+	lsdk TARGET_ROOTPART
+	yuros_form_dlvm
+	echo "TARGET_ROOTPART=$TARGET_ROOTPART" >>$PROFILE
+}
+
+
+yuros_form_guis() {
+	heads &&
+	echo "Desktop environtment"
+	DESKMODE=( 'gnome' 'hyprland' 'none' )
+	menus $DEKSMODE 'TARGET_DESKENVI'
+}
+
+
+yuros_form_prev() {
+	heads &&
+	echo 'OPERATION OVERVIEW'
+	echo ''
+	echo 'hostname    : ' $TARGET_HOSTNAME
+	echo 'operation   : ' $TARGET_INSTMODE
+	echo 'boot drive  : ' $TARGET_BOOTPART
+	echo 'root drive  : ' $TARGET_ROOTPART
+	echo 'username    : ' $TARGET_USERNAME
+	echo 'userpass    : ' $TARGET_USERPASS
+	echo 'desktop     : ' $TARGET_DESKENVI
+	echo '-----------------------------------------'
+
+	read -p 'Do you want continue installation process using this profile (Y/n) : ' DEPINIT_PROCS
+
+	if [[ $DEPINIT_PROCS = 'y' || $DEPINIT_PROCS = "Y" ]]; then
+		echo 'Starting installation process'
+		sleep 1
+	else
+		exit
+	fi
+}
+
+
+yuros_form_make() {
+	yuros_form_base &&
+	yuros_form_envi &&
+	yuros_form_mode &&
+	yuros_form_rlos &&
+	yuros_form_secs &&
+	yuros_form_cdsk &&
+	yuros_form_dbot &&
+	yuros_form_drot &&
+	yuros_form_guis &&
+	yuros_form_prev
+}
+
+
+yuros_form_host() {
+	heads &&
+  leads 'Select profile'
+  menuf "$LIBS_HOST" "TARGET_PROFILES"
+	source $LIBS_HOST/$TARGET_PROFILES
+}
+
+
+yuros_form_init() {
+	heads &&
+  leads 'Select operation'
+  OPSMODE=('install' 'recovery' 'reset')
+  menus $OPSMODE 'TARGET_OPERATION'
+	if [ $TARGET_OPERATION = 'install' ]; then
+		yuros_form_make 
+	else
+		yuros_form_host 
+	fi
+}:

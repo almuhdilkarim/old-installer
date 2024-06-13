@@ -1,0 +1,158 @@
+#!/bin/bash
+
+############################
+## INIT LOADER
+#############################
+
+
+yuros_link_load() {
+  # list all netwoks device and populate on array
+  GETNET=$(ls /sys/class/net | grep -v lo)
+  NETDEV=()
+  
+	for glink in "${GETNET}"
+	do
+		NETDEV+=($glink)
+	done
+}
+
+yuros_link_stat() {
+  if nc -zw1 google.com 443; then
+    echo "connected"
+    NETDEVSTA='online' 
+  else
+    echo "diconnected"
+    NETDEVSTA='offline'
+  fi
+}
+
+
+###############################
+### FORM
+################################
+
+yuros_link_form_list() {
+  ## list of Available network
+  heads &&
+  echo ''
+  echo 'Available network device : '
+	for ndev in "${!NETDEV[@]}"
+		do
+			echo "[$ndev] ${NETDEV[$ndev]}"
+	done
+  read -p 'select device :' NETDEVSET
+
+}
+
+yuros_link_form_ipmd() {
+  heads &&
+	echo ''
+	echo 'Internet protocol type :'
+	echo '[1] dhcp'
+	echo '[2] static'
+	read -p 'select type, ex "1" for dhcp : ' NETDEVIPM
+}
+
+
+yuros_link_form_ipin() {
+	heads &&
+  echo ''
+  read -p 'ip address : ' NETDEVIP4 
+  read -p 'netmask    : ' NETDEVMSK 
+	read -p 'gateway    : ' NETDEVGAT
+	read -p 'dns        : ' NETDEVDNS
+
+  if [[ $NETDEVGAT = "255.255.255.255" ]];then
+    NETDEVPRX=32
+  if [[ $NETDEVGAT = "255.255.255.0" ]];then
+    NETDEVPRX=24
+  elif [[ $NETDEVGAT = "255.255.0.0" ]];then
+    NETDEVPRX=16
+  elif [[ $NETDEVGAT = "255.0.0.0" ]];then
+    NETDEVPRX=8
+  else
+    NETDEVPRX=$NETDEVGAT
+  fi
+}
+
+yuros_link_form() {
+  yuros_link_form_list &&
+  yuros_link_form_ipmd &&
+  if [[ $NETDEVIPM = 2 ]];then
+    yuros_link_form_ipin
+  fi
+}
+
+
+#####################################
+##  WIRELESS
+#####################################
+
+yuros_link_wlan_confg() {
+  if [ $NETDEVIPM - 2 ];then
+    $NETPSKFILE=/var/lib/iwd/$NETDEVSSID.psl
+    echo "[IPv4]" >> $NETPSKFILE
+    echo "Address=$NETDEVIP4" >> $NETPSKFILE 
+    echo "Netmask=$NETDEVGAT" >> $NETPSKFILE
+    echo "Gateway=$NETDEVGAT" >> $NETPSKFILE
+    echo "Broadcast=$NETDEVGAT" >> $NETPSKFILE
+    echo "DNS=$NETDEVGAT" >> $NETPSKFILE
+    systemctl restart iwd 
+  fi
+}
+
+yuros_link_wlan_setup() {
+  heads &&
+	iwctl station $NETDEVSET get-networks 
+	read -p 'Insert your network name : ' NETDEVSSID
+	iwctl station $NETDEVSET connect $NETDEVSSID
+}
+
+
+yuros_link_wlan() {
+  yuros_link_wlan_setup &&
+  yuros_link_wlan_confg 
+}
+
+
+###################################
+## EHTERNET
+##################################
+
+yuros_link_ethr() {
+	if [ $NETDEVIPM = 2 ];then
+		sed -i "12s/DHCP=yes/#DHCP=yes/" /etc/systemd/network/20-ethernet.network &&
+		sed -i "13s/MulticastDNS=yes/#MulticastDNS=yes/" /etc/systemd/network/20-ethernet.network &&
+		sed -i "14i\Address=$NETDEVIP4/$NETDEVPRX" /etc/systemd/network/20-ethernet.network   &&
+		sed -i  "15i\Gateway=$NETDEVGAT"  /etc/systemd/network/20-ethernet.network &&
+		sed -i "16i\DNS=$SETIPDNS"  /etc/systemd/network/20-ethernet.network      &&
+		systemctl restart systemd-networkd
+	fi
+}
+
+
+###################################
+## GENERAL
+###################################
+
+yuros_link_main() {
+  if [[ $NETDEVSET = "wl"*  ]];then
+		yuros_link_wlan	
+	elif [[ $NETDEVSET = "en"* || $NETDEVSET = "et"* ]];then
+		yuros_link_ethr
+	else
+		echo "no predictable name"
+	fi
+}
+
+
+
+yuros_link_init() {
+  yuros_link_load &&
+  yuros_link_stat &&
+  if [ $NETDEVSTA = "offline" ];then
+    yuros_link_form
+    yuros_link_main
+  fi
+}
+
