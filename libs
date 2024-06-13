@@ -1,0 +1,168 @@
+#!/bin/bash
+
+#############################
+## FUNCTION LIBRARY
+############################
+
+heads() {
+	sleep 1
+	clear
+	line
+	echo " $TARGET_OSNAME - $TARGET_TAGS "
+	echo ' copyright null@2024 |  yuros frameworks '
+	line
+	echo ''
+	echo ''
+}
+
+lead() {
+	echo ''
+	line
+	echo ' Current Operation : '$1
+	line
+	echo ''
+}
+
+mdir() {
+	if [ ! -d $1 ]; then
+		mkdir $1
+		notif "$1 directory created"
+	else
+		notif "$1 directory existed"
+	fi
+}
+
+rdir() {
+	if [ ! -d $1 ]; then
+		rm -fr $1
+		notif "$1 removed"
+	else
+		notif "$1 not existed"
+	fi
+
+}
+
+mfil() {
+	if [ ! -f $1 ]; then
+		touch $1
+		notif "$1 file created"
+	else
+		notif "$1 file existed"
+	fi
+}
+
+auri() {
+	echo "$TARGET_USERNAME ALL=(ALL:ALL) NOPASSWD: ALL" >/etc/sudoers.d/01_$TARGET_USERNAME &&
+		su $TARGET_USERNAME -s /bin/bash -c "yes y | yay -S $1" &&
+		echo "$TARGET_USERNAME ALL=(ALL:ALL) ALL" >/etc/sudoers.d/01_$TARGET_USERNAME
+}
+
+gitc() {
+	git clone --quiet $1 $2 >/dev/null
+}
+
+mkpg() {
+	git clone https://aur.archlinux.org/$1 /tmp/$1
+	chown -R $TARGET_USERNAME:$TARGET_USERNAME /tmp/$1
+	echo "$TARGET_USERNAME ALL=(ALL:ALL) NOPASSWD: ALL" >/etc/sudoers.d/01_$TARGET_USERNAME &&
+		cd /tmp/$1 &&
+		su $TARGET_USERNAME -s /bin/bash -c "yes y | makepkg -rsi" &&
+		rm -fr /tmp/yay &&
+		echo "$TARGET_USERNAME ALL=(ALL:ALL) ALL" >/etc/sudoers.d/01_$TARGET_USERNAME
+}
+
+ldsk() {
+	GETDISK=$(lsblk --list --noheadings -o name)
+	ALLDISK=()
+	for dev in $GETDISK; do
+		if [[ ! $dev = "loop"* ]]; then
+			if [[ ! $dev = "rec"* ]]; then
+				ALLDISK+=($dev)
+			fi
+		fi
+	done
+
+	for i in "${!ALLDISK[@]}"; do
+		echo "[$i] ${ALLDISK[$i]}"
+	done
+	echo '----------------------------------------------------'
+	read -p "Select drive number : " OPTDISK
+
+	$1=$ALLDISK[$OPTDISK]
+}
+
+menuf() {
+	GETFILE=$(ls $1)
+	GETARRY=()
+	GETATTR=$2
+	for profile in $GETFILE; do
+		GETARRY+=($profile)
+	done
+	for prof in "${!GETARRY[@]}"; do
+		echo "[$prof] ${GETARRY[$prof]}"
+	done
+	read -p "Select option : " option
+	$GETATTR=$GETARRY[$OPTION]
+	echo "$GETATTR=$GETARRY[$OPTION]" >>$PROFILE
+}
+
+menus() {
+	GETVARS=$1
+	GETATTR=$2
+	for opt in "${GETVARS[@]}"; do
+		echo "[ $opt ] ${GETVARS[$opt]}"
+	done
+	read -p 'Select option : ' OPTION
+	$GETATTR=$GETVARS[$OPTION]
+	echo "$GETATTR=$GETVARS[$OPTION]" >>$PROFILE
+}
+
+notif() {
+	echo " |----> $1 ready "
+}
+
+line() {
+	echo '-----------------------------------------------------------'
+}
+
+notif_prep() {
+	echo ''
+	echo '[-] init preparation'
+	echo ' | ---------------------------------------------------------'
+}
+
+notif_inst() {
+	echo ''
+	echo '[-] init installation'
+	echo ' |---------------------------------------------------------'
+}
+
+notif_conf() {
+	echo ''
+	echo '[-] init configuration'
+	echo ' |----------------------------------------------------------'
+}
+
+ready_prep() {
+	echo ' |'
+	echo ' |-----------------------------------------------------------'
+	echo ' | preparation   : ready'
+	echo ''
+	sleep 1
+}
+
+ready_inst() {
+	echo ' |'
+	echo ' |-----------------------------------------------------------'
+	echo ' |  installation  : ready'
+	echo ''
+	sleep 1
+}
+
+ready_conf() {
+	echo ' |'
+	echo ' |------------------------------------------------------------'
+	echo ' |  configuration : ready'
+	echo ''
+	sleep 1
+}
