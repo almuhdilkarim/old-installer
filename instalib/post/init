@@ -1,0 +1,24 @@
+#!/bin/bash
+
+source /install/envi
+source /install/base
+source /install/cryp
+source /install/devl 
+source /install/edit
+source /install/guis
+source /install/kern
+source /install/link
+source /install/mult
+source /install/perf
+source /install/secs
+source /install/user
+source /install/virt
+
+ 
+
+
+
+yuros_core_init &&
+yuros_aurs_init &&
+yuros_guis_init 
+

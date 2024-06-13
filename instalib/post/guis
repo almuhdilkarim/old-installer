@@ -1,0 +1,172 @@
+#!/bin/bash
+
+
+#############################
+### NVIM
+#############################
+
+yuros_nvim_loaders() {
+	cp -fr /etc/skel/.config/nvim ~/.config/
+}
+
+
+#############################
+### HYPRLAND
+#############################
+
+yuros_hypr_package() {
+	echo ""
+	echo "DEKSTOP ENVIRONTMENT INSTALL"
+	echo ""
+	yes y | pacman -S hyprland polkit-gnome pipewire wofi pipewire-pulse pipewire-jack wireplumber xdg-desktop-portal-hyprland grim slurp wl-clipboard waybar swaync kitty nautilus mpd mpc ttf-font-awesome ttf-jetbrains-mono-nerd &&
+	echo ""
+	cd /home/$TARGET_USERNAME &&
+	yuros_aurget google-chrome wlogout &&
+	echo ""
+	echo "-----------------------------------------"
+	echo "desktop ready"
+}
+
+yuros_sddm_configs() {
+	yes y | pacman -S sddm xf86-input-libinput xorg-server xorg-xauth sddm &&
+	git clone https://github.com/almuhdilkarim/yuros-sddm /usr/share/sddm/themes/loco
+
+	mkdir /etc/sddm.conf.d &&
+	touch /etc/sddm.conf.d/00-rootles.conf && 
+	touch /etc/sddm.conf.d/10-wayland.conf &&
+
+
+cat << EOF > /etc/sddm.conf.d/sddm.conf
+[Theme]
+Current=loco
+EOF
+
+cat << EOF > /etc/sddm.conf.d/00-rootles.conf
+[General]
+DisplayServer=x11-user
+EOF
+echo '[1] ssdm rootless config : ready' &&
+sleep 1
+
+cat << EOF > /etc/sddm.conf.d/10-wayland.conf
+[General]
+DisplayServer=wayland
+GreeterEnvironment=QT_WAYLAND_SHELL_INTEGRATION=layer-shell
+
+[Wayland]
+CompositorCommand=kwin_wayland --drm --no-lockscreen --no-global-shortcuts --locale1
+EOF
+echo '[2] ssdm wayland config  : ready'
+sleep 1
+
+
+systemctl enable sddm &&
+echo '[3] enable ssdm'
+sleep 1
+
+}
+
+yuros_hypr_configs() {
+	cd /tmp &&
+	echo '[1] Clone hyrprland configuration'&&
+	git clone https://github.com/almuhdilkarim/yuros-dotfile &&	
+	rm -fr /tmp/yuros-dotfile/README.md &&
+	rm -fr /tmp/yuros-dotfile/.git &&
+	sleep 1
+
+	echo '[2] Create global configuration'&&
+	sudo cp -fr /tmp/yuros-dotfile/* /etc/skel/.config/ &&
+	rm /usr/share/hyprland/wall1.png &&
+	mv /usr/share/hyprland/wall0.png /usr/share/hyprland/login.png &&
+	cp /usr/share/hyprland/wall2.png /usr/share/hyprland/wall1.png &&
+	cp /usr/share/hyprland/wall2.png /usr/share/hyprland/wall0.png &&
+	sleep 1
+
+	echo '[3] Create configuration for existing user'&& 
+	sudo cp -fr /tmp/yuros-dotfile/* /home/$TARGET_USERNAME/.config/ &&
+	cp -fr /etc/skel/nvim /home/$TARGET_USERNAME/.config/ &&
+	chmod +x /home/$TARGET_USERNAME/.config/hypr/xdg-share &&
+	sleep 1
+
+	echo '[4] Enable audio socket' &&
+	su $TARGET_USERNAME -s /bin/bash -c "systemctl enable --user pipewire-pulse" &&
+	sleep 1
+
+	echo '[4] Cleaning installation file' &&
+	rm -fr /tmp/yuros-dotfile &&
+	sleep 1
+}
+
+yuros_hypr_init() {
+	yuros_section yuros_hypr_package &&
+	yuros_section yuros_hypr_configs &&
+	yuros_section yuros_sddm_configs
+}
+
+############################
+### GNOME
+############################
+
+yuros_gnom_package() {
+	
+	echo ""
+	echo "DEKSTOP ENVIRONTMENT INSTALL"
+	echo ""
+	pacman -S gnome gdm pipewire pipewire-pulse pipewire-jack wireplumber gdm xorg-xwayland xorg-xlsclients networkmanager &&
+	echo ""
+	cd /home/$TARGET_USERNAME &&
+	yuros_aurget google-chrome &&
+	echo ""
+	echo "-----------------------------------------"
+	echo "desktop ready"
+	
+}
+
+
+yuros_gnom_configs() {
+	cd /tmp &&
+	echo '[1] Clone gnome configuration'&&
+	##  git clone https://github.com/almuhdilkarim/yuros-dotfile &&
+	sleep 1
+
+	echo '[2] Create skel configuration'&&
+	## sudo cp -fr /tmp/yuros-dotfile /etc/skel/.config &&
+	sleep 1
+
+	echo '[3] Create configuration for existing user'&& 
+	echo "%wheel ALL=(ALL:ALL) ALL" > /etc/sudoers &&
+	usermod -aG wheel $TARGET_USERNAME &&
+	rm /etc/systemd/networkd/* &&
+	sleep 1
+
+
+	echo '[4] Enable daemon module socket' &&
+	su $TARGET_USERNAME -s /bin/bash -c "systemctl enable --user pipewire-pulse.socket" &&
+	systemctl enable NetworkManager.service &&
+	systemctl enable gdm &&
+	systemctl enable firewalld &&
+	sleep 1
+
+
+	echo '[5] Cleaning installation file' &&
+	## rm -fr /tmp/yuros-dotfile &&
+	sleep 1
+}
+
+yuros_gnom_init() {
+	yuros_section yuros_gnom_package &&
+	yuros_section yuros_gnom_configs
+}
+
+
+
+yuros_guis_init() {
+	if [ $TARGET_DESKENVI = "hyprland" ];then
+		yuros_hypr_init
+	elif [ $TARGET_DESKENVI = "gnome" ];then
+		yuros_gnom_init
+	else
+		echo "no dekstop environtment"
+	fi
+	yuros_nvim_loaders
+}

@@ -1,0 +1,102 @@
+#!/bin/bash
+
+##########################################
+## BOOT INIT
+##########################################
+
+
+yuros_boot_prep() {
+	
+	# prepare boot directory
+	mkdir /boot/efi &&
+	mkdir /boot/kernel &&
+	mv /boot/vmlinuz-linux-hardened /boot/kernel &&
+	mv /boot/intel-ucode.img /boot/kernel &&
+	rm /boot/initramfs*  &&
+
+
+	# prepare cpio config
+	cp /etc/mkinitcpio.conf /etc/mkinitcpio.d/default.conf &&
+	rm -fr /etc/mkinitcpio.conf.d &&
+
+	# prepare cpio preset
+	rm /etc/mkinitcpio.d/linux-hardened.preset &&
+
+	# prepare kern params
+	mkdir /etc/cmdline.d/
+	touch /etc/cmdline.d/01-boot.conf
+	touch /etc/cmdline.d/02-mods.conf
+	touch /etc/cmdline.d/03-secs.conf
+	touch /etc/cmdline.d/04-perf.conf
+	touch /etc/cmdline.d/05-misc.conf	
+}
+
+yuros_boot_inst() {
+	bootctl -q --path=/boot/ install &&
+	echo '[1] systemd boot: ready' &&
+	sleep 1
+}
+
+
+yuros_cpio_conf() {
+
+cat << EOF > /etc/mkinitcpio.d/linux-hardened.conf
+# mkinitcpio config for linux-hardened packcage
+
+MODULES=()
+BINARIES=()
+FILES=()
+HOOKS=(base udev autodetect microcode modconf keyboard keymap encrypt lvm2 block filesystems usr fsck)
+#COMPRESSION="zstd"
+#COMPRESSION="gzip"
+#COMPRESSION="bzip2"
+#COMPRESSION="lzma"
+#COMPRESSION="xz"
+#COMPRESSION="lzop"
+#COMPRESSION="lz4"
+#COMPRESSION_OPTIONS=()
+#MODULES_DECOMPRESS="no"
+EOF
+
+
+cat << EOF > /etc/mkinitcpio.d/linux-hardened.preset
+# mkinitcpio preset file for the 'linux-hardened' package
+
+ALL_config="/etc/mkinitcpio.d/linux-hardened.conf"
+ALL_kver="/boot/kernel/vmlinuz-linux-hardened"
+PRESETS=('default')
+default_uki="/boot/efi/Linux/yuros-hardened.efi"
+#default_options="--splash /usr/share/systemd/bootctl/splash-arch.bmp"
+EOF
+
+
+echo "[2] cpio config : ready"
+sleep 1 
+}
+
+
+yuros_kern_config() {
+	ROOT="/dev/mapper/$TARGET_LVM2NAME-root"
+	UUID=$(blkid /dev/$TARGET_ROOTPART | awk '{print $2}' | sed 's/\"//g' )
+	echo "cryptdevice=$UUID:cryptdev root=$ROOT" > /etc/cmdline.d/01-boot.conf &&
+	echo 'rw quiet' > /etc/cmdline.d/05-boot.conf &&
+	echo "[4] kernel param : ready" &&
+	sleep 1
+}
+
+
+yuros_boot_init() {
+	yuros_boot_config &&
+	yuros_cpio_config &&
+	yuros_cpio_preset &&
+	yuros_kern_params &&
+	sleep 1 &&
+	clear &&
+	echo 'GENERATE UEFI IMAGES'
+	echo '---------------------------------'
+	echo '' &&
+	mkinitcpio -P  &&
+	echo ''&&
+	echo '---------------------------------'&&
+	echo 'uefi images : generated '
+}

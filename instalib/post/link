@@ -1,0 +1,34 @@
+#!/bin/bash
+
+#####################################
+## NETWORK
+######################################
+
+yuros_resolv_conf() {
+	echo '# Resolver configuration file.' > /etc/resolv.conf &&
+	echo '# See resolv.conf(5) for details.' >> /etc/resolv.conf &&
+	echo 'nameserver 8.8.8.8' >> /etc/resolv.conf &&
+	echo 'nameserver 1.1.1.1' >> /etc/resolv.conf
+}
+
+
+yuros_iwddev_conf() {
+
+mkdir /etc/iwd &&
+touch /etc/iwd/main.conf &&
+cat << EOF > /etc/iwd/main.conf
+[General]
+EnableNetworkConfiguration=true
+
+[Network]
+RoutePriorityOffset=300		
+EOF
+
+echo "[1] wireless : ready" &&
+sleep 1
+}
+
+yuros_link_init() {
+	yuros_resolv_conf &&
+	yuros_iwddev_conf &&
+}

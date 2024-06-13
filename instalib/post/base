@@ -1,0 +1,204 @@
+#!/bin/bash
+
+#########################################
+## BASED CONFIG
+#########################################
+
+yuros_bcon_tzon() {
+	ln -sf /usr/share/zoneInfo/Asia/Jakarta /etc/localtime &&
+		hwclock --systohc
+}
+
+yuros_bconf_loca() {
+	echo "en_US.UTF-8 UTF-8" >>/etc/locale.gen &&
+		echo "en_US ISO-8859-1" >>/etc/locale.gen &&
+		locale-gen >/dev/null &&
+		locale >/etc/locale.conf &&
+		echo "LANG=en_US.UTF-8" 1<>/etc/locale.conf
+}
+
+yuros_bcon_issu() {
+	cat <<EOF >/etc/issue
+$TARGET_OSNAME - $TARGET_OSTAGS
+copyright by null@2024
+-----------------------------------------
+kernel : Linux \r 
+sheel  : (\l)
+-----------------------------------------
+EOF
+}
+
+yuros_bconf_osid() {
+	cat <<EOF >/usr/lib/os-release
+NAME="$TARGET_OSNAME"
+PRETTY_NAME="$TARGET_OSPRET"
+ID=$TARGET_OSIDNM
+BUILD_ID=rolling
+ANSI_COLOR="38;2;23;147;209"
+HOME_URL="$TARGET_OSLINK"
+DOCUMENTATION_URL="$TARGET_OSDOCS"
+SUPPORT_URL="$TARGET_OSSUPO""
+BUG_REPORT_URL="$TARGET_OSBUGS"
+PRIVACY_POLICY_URL="$TARGET_OSPOLI"
+LOGO=$TARGET_OSLOGO
+IMAGE_ID=$TARGET_IMGIDS
+IMAGE_VERSION=2024.05.01
+EOF
+}
+
+yuros_bcon_barc() {
+	cat <<EOF >>/etc/bash.bashrc
+# ALIAS
+alias ls='ls --color=auto'
+alias get='yay -S'
+alias rem='yay -R'
+alias upd='yay -Syu'
+alias die='poweroff'
+alias grep='grep --color=auto'
+EOF
+}
+
+yuros_bcon_sbrc() {
+	cat <<EOF >/etc/skel/.bashrc
+# $TARGET_OSNAME | $TARGET_OSTAGS
+# ~/.bashrc
+#
+EOF
+}
+
+yuros_bcon_spro() {
+	cat <<EOF >>/etc/skel/.bash_profile
+# $TARGET_OSNAME | $TARGET_OSTAGS
+# ~/.bash_profile
+EOF
+}
+
+yuros_bcon_host() {
+	## hostname
+	touch /etc/hostname &&
+		echo "$TARGET_HOSTNAME" >/etc/hostname &&
+		notif 'hostname'
+	## host
+	echo "127.0.0.1	localhost" >>/etc/hosts &&
+		echo "127.0.0.1	$TARGET_HOSTNAME.localdomain $TARGET_HOSTNAME" >>/etc/hosts
+	notif 'host'
+}
+
+yuros_bcon_init() {
+	heads &&
+		lead "Base Configuration"
+	notif_conf &&
+		yuros_bconf_tzon &&
+		yuros_bconf_loca &&
+		yuros_bconf_issu &&
+		yuros_bconf_osid &&
+		yuros_bconf_barc &&
+		yuros_bconf_sbrc &&
+		yuros_bconf_spro &&
+		yuros_bconf_rbin &&
+		yuros_bconf_nvim &&
+		yuros_bconf_host &&
+		ready_conf
+}
+
+###################################
+### RBIN INSTALL
+###################################
+
+yuros_rbin_prep() {
+	notif_prep
+	rdir "/usr/share/rbin"
+	ready_prep
+}
+
+yuros_rbin_inst() {
+	notif_inst
+	gitc https://github.com/almuhdilkarim/yuros-rbin /usr/local/rbin
+	ready_inst
+}
+
+yuros_rbin_conf() {
+	notif_prep
+	sed -i "15i\append_path '\/usr\/local\/rbin'" /etc/profile
+	notif 'add rbin environtment'
+	rdir "/usr/local/rbin/.git"
+	notif 'remove git directory'
+	chmod +x /usr/local/rbin/*
+	notif 'access configured'
+	ready_prep
+}
+
+yuros_rbin_init() {
+	yuros_rbin_prep &&
+		yuros_rbin_inst &&
+		yuros_rbin_conf
+}
+
+####################################
+### NVIM INSTALL
+####################################
+
+yuros_nvim_prep() {
+	notif_prep
+	mdir /etc/skel/.config
+	mdir /etc/skel/.config/nvim
+	ready_prep
+}
+
+yuros_nvim_inst() {
+	notif_inst
+	yes -y | pacman -S neovim
+	gitc 'https://github.com/LazyVim/starter' '/etc/skel/.config/nvim/' &&
+		ready_inst
+}
+
+yuros_nvim_conf() {
+	notif_conf
+	echo "vim.opt.clipboard = 'unnamedplus'" >>/etc/skel/.config/nvim/init.lua
+	notif 'enable clipboard'
+	rdir /etc/skel/.config/.git
+	notif 'clean git repository'
+	ready_conf
+}
+
+yuros_nvim_init() {
+	heads &&
+		lead "Nvim Installation"
+	yuros_nvim_prep
+	yuros_nvim_inst
+	yuros_nvim_conf
+}
+
+####################################
+### AUR INSTALL
+####################################
+
+yuros_aurs_prep() {
+	notif_prep
+	ready_prep
+}
+
+yuros_aurs_inst() {
+	notif_inst && mkpg 'yay' && ready_inst
+}
+
+yuros_aurs_conf() {
+	notif_conf
+	ready_conf
+}
+
+yuros_aurs_init() {
+	yuros_aurs_prep
+	yuros_aurs_inst
+	yuros_aurs_conf
+}
+
+###################################
+### MAIN FUNCTION
+###################################
+
+yuros_main_init() {
+	yuros_bcon_init &&
+		yuros_nvim_init &&
+		yuros_aurs_init
+}
