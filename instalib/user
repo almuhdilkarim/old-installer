@@ -1,0 +1,28 @@
+#!/bin/bash
+
+###################################
+### USER CONFIGURATION
+###################################
+
+
+yuros_user_make() {
+	TARGET_USERPASS=$(perl -e 'print crypt($ARGV[0], "password")' $TARGET_USERPASS)
+  if [ $TARGET_USERNAME = "root" ];then
+    passwd -p $TARGET_USERPASS root
+  else
+	  useradd -m -p $TARGET_USERPASS $TARGET_USERNAME
+    passwd -l root
+  fi
+}
+
+yuros_user_admn() {
+  if [ ! $TARGET_USERPASS = "root" ];then
+	  touch /etc/sudoers.d/01_$TARGET_USERNAME &&
+	  echo "$TARGET_USERNAME ALL=(ALL:ALL) ALL" > /etc/sudoers.d/01_$TARGET_USERNAME
+  fi
+}
+
+yuros_user_init() {
+  yuros_user_admn &&
+  yuros_user_make
+}
